@@ -1,61 +1,18 @@
-import { StaffMember } from '@/types';
+import { firestore } from '@/lib/firebase';
+import { addDoc, collection, getDocs } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-
-// Mock data for demo
-const mockStaff: StaffMember[] = [
-	{
-		id: '1',
-		name: 'Dr. Sarah Johnson',
-		role: 'doctor',
-		specialty: 'General Medicine',
-		shiftStart: '09:00',
-		shiftEnd: '17:00',
-		patientsServed: 45,
-		location: 'Clinic A',
-		contactNumber: '+91-9876543210',
-		email: 'sarah.johnson@jsf.org',
-		isActive: true,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	},
-	{
-		id: '2',
-		name: 'Nurse Priya Sharma',
-		role: 'nurse',
-		specialty: 'Emergency Care',
-		shiftStart: '08:00',
-		shiftEnd: '16:00',
-		patientsServed: 38,
-		location: 'Clinic B',
-		contactNumber: '+91-9876543211',
-		email: 'priya.sharma@jsf.org',
-		isActive: true,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	},
-	{
-		id: '3',
-		name: 'Dr. Rajesh Kumar',
-		role: 'doctor',
-		specialty: 'Cardiology',
-		shiftStart: '10:00',
-		shiftEnd: '18:00',
-		patientsServed: 52,
-		location: 'Clinic C',
-		contactNumber: '+91-9876543212',
-		email: 'rajesh.kumar@jsf.org',
-		isActive: true,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	},
-];
 
 // GET /api/staff
 export async function GET(request: NextRequest) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const { searchParams } = new URL(request.url);
 		const page = parseInt(searchParams.get('page') ?? '1');
-		const limit = parseInt(searchParams.get('limit') ?? '10');
+		const limitVal = parseInt(searchParams.get('limit') ?? '10');
 		const search = searchParams.get('search') ?? '';
 		const role = searchParams.get('role') ?? '';
 		const location = searchParams.get('location') ?? '';
@@ -63,56 +20,52 @@ export async function GET(request: NextRequest) {
 		const sortBy = searchParams.get('sortBy') ?? 'createdAt';
 		const sortOrder = searchParams.get('sortOrder') ?? 'desc';
 
-		let filteredData = [...mockStaff];
-
-		// Apply filters
-		if (search) {
-			filteredData = filteredData.filter((member) =>
+		const q = collection(firestore, 'staff');
+		const staffQuery = q;
+		const snapshot = await getDocs(staffQuery);
+		let data = snapshot.docs.map((doc) => {
+			const d = doc.data() as any;
+			return {
+				id: doc.id,
+				...d,
+				createdAt: d.createdAt?.toDate
+					? d.createdAt.toDate()
+					: d.createdAt,
+				updatedAt: d.updatedAt?.toDate
+					? d.updatedAt.toDate()
+					: d.updatedAt,
+			};
+		});
+		if (search)
+			data = data.filter((member) =>
 				member.name.toLowerCase().includes(search.toLowerCase())
 			);
-		}
-		if (role) {
-			filteredData = filteredData.filter(
-				(member) => member.role === role
-			);
-		}
-		if (location) {
-			filteredData = filteredData.filter((member) =>
+		if (role) data = data.filter((member) => member.role === role);
+		if (location)
+			data = data.filter((member) =>
 				member.location.toLowerCase().includes(location.toLowerCase())
 			);
-		}
 		if (isActive !== null) {
 			const activeFilter = isActive === 'true';
-			filteredData = filteredData.filter(
-				(member) => member.isActive === activeFilter
-			);
+			data = data.filter((member) => member.isActive === activeFilter);
 		}
-
-		// Apply sorting
-		filteredData.sort((a, b) => {
-			const aValue = a[sortBy as keyof StaffMember] ?? '';
-			const bValue = b[sortBy as keyof StaffMember] ?? '';
-
-			if (sortOrder === 'asc') {
-				return aValue > bValue ? 1 : -1;
-			} else {
-				return aValue < bValue ? 1 : -1;
-			}
+		data.sort((a, b) => {
+			const aValue = a[sortBy] ?? '';
+			const bValue = b[sortBy] ?? '';
+			if (sortOrder === 'asc') return aValue > bValue ? 1 : -1;
+			else return aValue < bValue ? 1 : -1;
 		});
-
-		// Apply pagination
-		const startIndex = (page - 1) * limit;
-		const endIndex = startIndex + limit;
-		const paginatedData = filteredData.slice(startIndex, endIndex);
-
+		const startIndex = (page - 1) * limitVal;
+		const endIndex = startIndex + limitVal;
+		const paginatedData = data.slice(startIndex, endIndex);
 		return NextResponse.json({
 			success: true,
 			data: paginatedData,
 			pagination: {
 				page,
-				limit,
-				total: filteredData.length,
-				totalPages: Math.ceil(filteredData.length / limit),
+				limit: limitVal,
+				total: data.length,
+				totalPages: Math.ceil(data.length / limitVal),
 			},
 		});
 	} catch (error) {
@@ -126,6 +79,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/staff
 export async function POST(request: NextRequest) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const body = await request.json();
 		const {
@@ -140,8 +98,6 @@ export async function POST(request: NextRequest) {
 			email,
 			isActive,
 		} = body;
-
-		// Validate required fields
 		if (
 			!name ||
 			!role ||
@@ -156,9 +112,7 @@ export async function POST(request: NextRequest) {
 				{ status: 400 }
 			);
 		}
-
-		const newStaff: StaffMember = {
-			id: (mockStaff.length + 1).toString(),
+		const newStaff = {
 			name,
 			role,
 			specialty: specialty || '',
@@ -168,16 +122,14 @@ export async function POST(request: NextRequest) {
 			location,
 			contactNumber,
 			email,
-			isActive: Boolean(isActive),
+			isActive: typeof isActive === 'boolean' ? isActive : true,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 		};
-
-		mockStaff.push(newStaff);
-
+		const docRef = await addDoc(collection(firestore, 'staff'), newStaff);
 		return NextResponse.json({
 			success: true,
-			data: newStaff,
+			data: { id: docRef.id, ...newStaff },
 			message: 'Staff member added successfully',
 		});
 	} catch (error) {

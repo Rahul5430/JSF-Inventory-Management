@@ -1,50 +1,24 @@
 import { getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { Firestore, getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Check if Firebase config environment variables are set
-const requiredEnvVars = [
-	'NEXT_PUBLIC_FIREBASE_API_KEY',
-	'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-	'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-	'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-	'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-	'NEXT_PUBLIC_FIREBASE_APP_ID',
-];
-
-const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
-
-if (missingEnvVars.length > 0) {
-	console.warn(
-		'Missing Firebase environment variables:',
-		missingEnvVars.join(', ')
-	);
-	console.warn(
-		'Please create a .env.local file with your Firebase configuration.'
-	);
-}
-
 const firebaseConfig = {
-	apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'placeholder-api-key',
+	apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
 	authDomain:
-		process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
-		'placeholder.firebaseapp.com',
+		process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
 	projectId:
-		process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'placeholder-project',
+		process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
 	storageBucket:
-		process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-		'placeholder.appspot.com',
+		process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
 	messagingSenderId:
-		process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '123456789',
+		process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
 	appId:
-		process.env.NEXT_PUBLIC_FIREBASE_APP_ID ||
-		'1:123456789:web:placeholder',
+		process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only if we have valid config
 let app;
-let firestore;
+let firestore: Firestore | null;
 let auth;
 let storage;
 
@@ -59,13 +33,13 @@ try {
 	console.error('Firebase initialization error:', error);
 
 	// Create mock objects for development
-	if (process.env.NODE_ENV === 'development') {
-		console.warn('Using mock Firebase services for development');
-		app = null;
-		firestore = null;
-		auth = null;
-		storage = null;
-	}
+	// if (process.env.NODE_ENV === 'development') {
+	// 	console.warn('Using mock Firebase services for development');
+	// 	// app = null;
+	// 	// firestore = null;
+	// 	auth = null;
+	// 	// storage = null;
+	// }
 }
 
 export { auth, firestore, storage };

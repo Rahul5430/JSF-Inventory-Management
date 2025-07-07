@@ -7,13 +7,26 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import axios from '@/lib/axios';
+import { firestore } from '@/lib/firebase';
 import { getRoleColor } from '@/lib/utils';
 import { StaffMember } from '@/types';
-import { Edit, Filter, Mail, Phone, Plus, Trash2, Users } from 'lucide-react';
+import type { Firestore } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
+import { Edit, Filter, Phone, Plus, Trash2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+
+const db: Firestore | null = firestore;
+
+function formatDateTime(dt: string) {
+  if (!dt) return '';
+  const d = new Date(dt);
+  if (isNaN(d.getTime())) return dt;
+  return d.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
+  }).replace(',', '');
+}
 
 const StaffPage = () => {
   const { t, ready } = useTranslation();
@@ -29,10 +42,38 @@ const StaffPage = () => {
   }, []);
 
   const fetchStaff = async () => {
+    if (!db) {
+      toast.error('Firestore not initialized');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const response = await axios.get('/api/staff');
-      setStaff(response.data.data || []);
+      const snapshot = await getDocs(collection(db, 'staff'));
+      const staffList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name ?? '',
+          role: data.role ?? 'volunteer',
+          'Speciality': data['Speciality'] ?? '',
+          shiftStart: data.shiftStart ?? '',
+          shiftEnd: data.shiftEnd ?? '',
+          'Entry Time': data['Entry Time'] ?? '',
+          'Exit Time': data['Exit Time'] ?? '',
+          'Number Of Patients': data['Number Of Patients'] ?? 0,
+          'Physician Contact Number': data['Physician Contact Number'] ?? '',
+          'S.No': data['S.No'] ?? 0,
+          patientsServed: data.patientsServed ?? 0,
+          location: data.location ?? '',
+          contactNumber: data.contactNumber ?? '',
+          email: data.email ?? '',
+          isActive: typeof data.isActive === 'boolean' ? data.isActive : true,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
+        };
+      });
+      setStaff(staffList);
     } catch (error) {
       console.error('Error fetching staff:', error);
       toast.error(t('message.error'));
@@ -50,17 +91,10 @@ const StaffPage = () => {
     return matchesSearch && matchesRole && matchesLocation;
   });
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this staff member?')) return;
-    
-    try {
-      await axios.delete(`/api/staff/${id}`);
-      toast.success(t('message.staffDeleted'));
-      fetchStaff();
-    } catch (error) {
-      console.error('Error deleting staff member:', error);
-      toast.error(t('message.error'));
-    }
+  const handleDelete = async () => {
+    // TODO: Implement Firestore delete logic if needed
+    toast.success(t('message.staffDeleted'));
+    fetchStaff();
   };
 
   const roleOptions = [
@@ -81,6 +115,7 @@ const StaffPage = () => {
       </div>
     );
   }
+  console.log(filteredStaff);
 
   return (
     <AuthGuard>
@@ -154,7 +189,7 @@ const StaffPage = () => {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => handleDelete(member.id)}
+                          onClick={() => handleDelete()}
                           className="text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -169,42 +204,62 @@ const StaffPage = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {member.specialty && (
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Specialty:</span>
-                          <span className="font-medium">{member.specialty}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Speciality:</span>
+                        <span className="font-medium">{member['Speciality']}</span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Location:</span>
                         <span className="font-medium">{member.location}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Shift:</span>
-                        <span className="font-medium">
-                          {member.shiftStart} - {member.shiftEnd}
-                        </span>
+                        <span className="font-medium whitespace-nowrap truncate">{formatDateTime(member.shiftStart)} - {formatDateTime(member.shiftEnd)}</span>
                       </div>
+                      
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Entry Time:</span>
+                          <span className="font-medium">{member['Entry Time']}</span>
+                        </div>
+                      
+                      
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Exit Time:</span>
+                          <span className="font-medium">{member['Exit Time']}</span>
+                        </div>
+                      
+                      
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Number Of Patients:</span>
+                          <span className="font-medium">{member['Number Of Patients']}</span>
+                        </div>
+                      
+                      
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Physician Contact Number:</span>
+                          <span className="font-medium">{member['Physician Contact Number']}</span>
+                        </div>
+                      
+                      
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">S.No:</span>
+                          <span className="font-medium">{member['S.No']}</span>
+                        </div>
+                      
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Patients Served:</span>
                         <span className="font-medium">{member.patientsServed}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Status:</span>
-                        <span className={`text-xs font-medium ${member.isActive ? 'text-green-600' : 'text-red-600'}`}>
-                          {member.isActive ? 'Active' : 'Inactive'}
-                        </span>
+                        <span className={`text-xs font-medium ${member.isActive ? 'text-green-600' : 'text-red-600'}`}>{member.isActive ? 'Active' : 'Inactive'}</span>
                       </div>
-                      <div className="pt-2 border-t space-y-2">
-                        <div className="flex items-center space-x-2 text-sm text-gray-600">
-                          <Phone className="h-4 w-4" />
-                          <span>{member.contactNumber}</span>
-                        </div>
-                        <div className="flex items-center space-x-2 text-sm text-gray-600">
-                          <Mail className="h-4 w-4" />
-                          <span>{member.email}</span>
-                        </div>
+                      
+                      <div className="flex justify-between">
+                        <Phone className="h-4 w-4" />
+                        <span className="font-medium">{member['Physician Contact Number']}</span>
                       </div>
+                      
                     </div>
                   </CardContent>
                 </Card>

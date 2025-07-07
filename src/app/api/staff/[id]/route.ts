@@ -1,67 +1,44 @@
-import { StaffMember } from '@/types';
+import { firestore } from '@/lib/firebase';
+import { deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-
-// Mock data for demo
-const mockStaff: StaffMember[] = [
-	{
-		id: '1',
-		name: 'Dr. Sarah Johnson',
-		role: 'doctor',
-		specialty: 'General Medicine',
-		shiftStart: '09:00',
-		shiftEnd: '17:00',
-		patientsServed: 45,
-		location: 'Clinic A',
-		contactNumber: '+91-9876543210',
-		email: 'sarah.johnson@jsf.org',
-		isActive: true,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	},
-	{
-		id: '2',
-		name: 'Nurse Priya Sharma',
-		role: 'nurse',
-		specialty: 'Emergency Care',
-		shiftStart: '08:00',
-		shiftEnd: '16:00',
-		patientsServed: 38,
-		location: 'Clinic B',
-		contactNumber: '+91-9876543211',
-		email: 'priya.sharma@jsf.org',
-		isActive: true,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	},
-];
 
 // GET /api/staff/[id]
 export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const { id } = await params;
-
-		if (!id) {
+		if (!id)
 			return NextResponse.json(
 				{ success: false, error: 'Staff ID is required' },
 				{ status: 400 }
 			);
-		}
-
-		const staff = mockStaff.find((member) => member.id === id);
-
-		if (!staff) {
+		const docRef = doc(firestore, 'staff', id);
+		const docSnap = await getDoc(docRef);
+		if (!docSnap.exists())
 			return NextResponse.json(
 				{ success: false, error: 'Staff member not found' },
 				{ status: 404 }
 			);
-		}
-
+		const data = docSnap.data() as any;
 		return NextResponse.json({
 			success: true,
-			data: staff,
+			data: {
+				id: docSnap.id,
+				...data,
+				createdAt: data.createdAt?.toDate
+					? data.createdAt.toDate()
+					: data.createdAt,
+				updatedAt: data.updatedAt?.toDate
+					? data.updatedAt.toDate()
+					: data.updatedAt,
+			},
 		});
 	} catch (error) {
 		console.error('Error fetching staff member:', error);
@@ -77,33 +54,21 @@ export async function PUT(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const { id } = await params;
 		const body = await request.json();
-
-		if (!id) {
+		if (!id)
 			return NextResponse.json(
 				{ success: false, error: 'Staff ID is required' },
 				{ status: 400 }
 			);
-		}
-
-		const memberIndex = mockStaff.findIndex((member) => member.id === id);
-
-		if (memberIndex === -1) {
-			return NextResponse.json(
-				{ success: false, error: 'Staff member not found' },
-				{ status: 404 }
-			);
-		}
-
-		// Update the staff member
-		mockStaff[memberIndex] = {
-			...mockStaff[memberIndex],
-			...body,
-			updatedAt: new Date(),
-		};
-
+		const docRef = doc(firestore, 'staff', id);
+		await updateDoc(docRef, { ...body, updatedAt: new Date() });
 		return NextResponse.json({
 			success: true,
 			message: 'Staff member updated successfully',
@@ -122,28 +87,20 @@ export async function DELETE(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const { id } = await params;
-
-		if (!id) {
+		if (!id)
 			return NextResponse.json(
 				{ success: false, error: 'Staff ID is required' },
 				{ status: 400 }
 			);
-		}
-
-		const memberIndex = mockStaff.findIndex((member) => member.id === id);
-
-		if (memberIndex === -1) {
-			return NextResponse.json(
-				{ success: false, error: 'Staff member not found' },
-				{ status: 404 }
-			);
-		}
-
-		// Remove the staff member
-		mockStaff.splice(memberIndex, 1);
-
+		const docRef = doc(firestore, 'staff', id);
+		await deleteDoc(docRef);
 		return NextResponse.json({
 			success: true,
 			message: 'Staff member deleted successfully',

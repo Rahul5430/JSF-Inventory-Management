@@ -1,111 +1,71 @@
-import { InventoryItem } from '@/types';
+import { firestore } from '@/lib/firebase';
+import { addDoc, collection, getDocs, query } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-
-// Mock data for demo
-const mockInventory: InventoryItem[] = [
-	{
-		id: '1',
-		name: 'Paracetamol 500mg',
-		quantity: 50,
-		cost: 2.5,
-		location: 'Medical Store A',
-		expiryDate: new Date('2024-12-31'),
-		purpose: 'Pain relief',
-		category: 'medicine',
-		minStockLevel: 20,
-		unit: 'tablets',
-		createdAt: new Date(),
-		updatedAt: new Date(),
-		createdBy: 'admin',
-	},
-	{
-		id: '2',
-		name: 'Surgical Masks',
-		quantity: 200,
-		cost: 1.0,
-		location: 'Medical Store B',
-		expiryDate: new Date('2025-06-30'),
-		purpose: 'Protection',
-		category: 'supplies',
-		minStockLevel: 100,
-		unit: 'pieces',
-		createdAt: new Date(),
-		updatedAt: new Date(),
-		createdBy: 'admin',
-	},
-	{
-		id: '3',
-		name: 'Blood Pressure Monitor',
-		quantity: 5,
-		cost: 1500.0,
-		location: 'Equipment Room',
-		expiryDate: new Date('2026-12-31'),
-		purpose: 'Patient monitoring',
-		category: 'equipment',
-		minStockLevel: 2,
-		unit: 'units',
-		createdAt: new Date(),
-		updatedAt: new Date(),
-		createdBy: 'admin',
-	},
-];
 
 // GET /api/inventory
 export async function GET(request: NextRequest) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const { searchParams } = new URL(request.url);
 		const page = parseInt(searchParams.get('page') ?? '1');
-		const limit = parseInt(searchParams.get('limit') ?? '10');
+		const limitVal = parseInt(searchParams.get('limit') ?? '10');
 		const search = searchParams.get('search') ?? '';
 		const category = searchParams.get('category') ?? '';
 		const location = searchParams.get('location') ?? '';
 		const sortBy = searchParams.get('sortBy') ?? 'createdAt';
 		const sortOrder = searchParams.get('sortOrder') ?? 'desc';
 
-		let filteredData = [...mockInventory];
+		const q = collection(firestore, 'inventory');
+		const inventoryQuery = query(q);
 
-		// Apply filters
-		if (search) {
-			filteredData = filteredData.filter((item) =>
+		// Filtering (client-side for now)
+		const snapshot = await getDocs(inventoryQuery);
+		let data = snapshot.docs.map((doc) => {
+			const d = doc.data() as any;
+			return {
+				id: doc.id,
+				...d,
+				expiryDate: d.expiryDate?.toDate
+					? d.expiryDate.toDate()
+					: d.expiryDate,
+				createdAt: d.createdAt?.toDate
+					? d.createdAt.toDate()
+					: d.createdAt,
+				updatedAt: d.updatedAt?.toDate
+					? d.updatedAt.toDate()
+					: d.updatedAt,
+			};
+		});
+		if (search)
+			data = data.filter((item) =>
 				item.name.toLowerCase().includes(search.toLowerCase())
 			);
-		}
-		if (category) {
-			filteredData = filteredData.filter(
-				(item) => item.category === category
-			);
-		}
-		if (location) {
-			filteredData = filteredData.filter((item) =>
+		if (category) data = data.filter((item) => item.category === category);
+		if (location)
+			data = data.filter((item) =>
 				item.location.toLowerCase().includes(location.toLowerCase())
 			);
-		}
-
-		// Apply sorting
-		filteredData.sort((a, b) => {
-			const aValue = a[sortBy as keyof InventoryItem] ?? '';
-			const bValue = b[sortBy as keyof InventoryItem] ?? '';
-
-			if (sortOrder === 'asc') {
-				return aValue > bValue ? 1 : -1;
-			} else {
-				return aValue < bValue ? 1 : -1;
-			}
+		data.sort((a, b) => {
+			const aValue = a[sortBy] ?? '';
+			const bValue = b[sortBy] ?? '';
+			if (sortOrder === 'asc') return aValue > bValue ? 1 : -1;
+			else return aValue < bValue ? 1 : -1;
 		});
-
-		// Apply pagination
-		const startIndex = (page - 1) * limit;
-		const endIndex = startIndex + limit;
-		const paginatedData = filteredData.slice(startIndex, endIndex);
-
+		const startIndex = (page - 1) * limitVal;
+		const endIndex = startIndex + limitVal;
+		const paginatedData = data.slice(startIndex, endIndex);
 		return NextResponse.json({
 			success: true,
 			data: paginatedData,
 			pagination: {
 				page,
-				limit,
-				total: filteredData.length,
-				totalPages: Math.ceil(filteredData.length / limit),
+				limit: limitVal,
+				total: data.length,
+				totalPages: Math.ceil(data.length / limitVal),
 			},
 		});
 	} catch (error) {
@@ -119,6 +79,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/inventory
 export async function POST(request: NextRequest) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const body = await request.json();
 		const {
@@ -132,9 +97,8 @@ export async function POST(request: NextRequest) {
 			category,
 			minStockLevel,
 			unit,
+			createdBy,
 		} = body;
-
-		// Validate required fields
 		if (
 			!name ||
 			!quantity ||
@@ -149,29 +113,28 @@ export async function POST(request: NextRequest) {
 				{ status: 400 }
 			);
 		}
-
-		const newItem: InventoryItem = {
-			id: (mockInventory.length + 1).toString(),
+		const newItem = {
 			name,
 			quantity: parseInt(quantity),
 			cost: parseFloat(cost) || 0,
 			location,
 			expiryDate: new Date(expiryDate),
-			donor: donor || '',
+			donor: donor ?? '',
 			purpose,
 			category,
 			minStockLevel: parseInt(minStockLevel) || 0,
 			unit,
 			createdAt: new Date(),
 			updatedAt: new Date(),
-			createdBy: 'admin',
+			createdBy: createdBy ?? '',
 		};
-
-		mockInventory.push(newItem);
-
+		const docRef = await addDoc(
+			collection(firestore, 'inventory'),
+			newItem
+		);
 		return NextResponse.json({
 			success: true,
-			data: newItem,
+			data: { id: docRef.id, ...newItem },
 			message: 'Item added successfully',
 		});
 	} catch (error) {

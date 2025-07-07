@@ -18,7 +18,7 @@ export interface InventoryItem {
 	quantity: number;
 	cost: number;
 	location: string;
-	expiryDate: Date;
+	expiryWeeks: number;
 	donor?: string;
 	purpose: string;
 	category: 'medicine' | 'equipment' | 'supplies';
@@ -33,9 +33,14 @@ export interface StaffMember {
 	id: string;
 	name: string;
 	role: 'doctor' | 'nurse' | 'volunteer' | 'coordinator' | 'admin';
-	specialty?: string;
+	Speciality: string;
 	shiftStart: string;
 	shiftEnd: string;
+	'Entry Time': string;
+	'Exit Time': string;
+	'Number Of Patients': number;
+	'Physician Contact Number': string;
+	'S.No': number;
 	patientsServed: number;
 	location: string;
 	contactNumber: string;
@@ -60,7 +65,7 @@ export interface Report {
 	id: string;
 	type: 'inventory' | 'staff' | 'usage';
 	title: string;
-	data: any;
+	data: unknown;
 	generatedAt: Date;
 	generatedBy: string;
 }

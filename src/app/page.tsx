@@ -5,8 +5,10 @@ import Sidebar from '@/components/layout/Sidebar';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatCurrency, isExpired, isExpiringSoon } from '@/lib/utils';
+import { firestore } from '@/lib/firebase';
+import { formatCurrency } from '@/lib/utils';
 import { InventoryItem, StaffMember } from '@/types';
+import { collection, getDocs } from 'firebase/firestore';
 import {
 	AlertTriangle,
 	Calendar,
@@ -14,6 +16,7 @@ import {
 	TrendingUp,
 	Users
 } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,95 +36,99 @@ const DashboardPage = () => {
 	const [recentStaff, setRecentStaff] = useState<StaffMember[]>([]);
 
 	useEffect(() => {
-		// For demo purposes, set some dummy data
-		setStats({
-			totalInventory: 150,
-			totalStaff: 25,
-			lowStockItems: 8,
-			expiringItems: 12,
-			totalValue: 45000,
-		});
-		
-		// Set dummy inventory data
-		setRecentInventory([
-			{
-				id: '1',
-				name: 'Paracetamol 500mg',
-				quantity: 50,
-				cost: 2.5,
-				location: 'Medical Store A',
-				expiryDate: new Date('2024-12-31'),
-				purpose: 'Pain relief',
-				category: 'medicine',
-				minStockLevel: 20,
-				unit: 'tablets',
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				createdBy: 'admin',
-			},
-			{
-				id: '2',
-				name: 'Surgical Masks',
-				quantity: 200,
-				cost: 1.0,
-				location: 'Medical Store B',
-				expiryDate: new Date('2025-06-30'),
-				purpose: 'Protection',
-				category: 'supplies',
-				minStockLevel: 100,
-				unit: 'pieces',
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				createdBy: 'admin',
-			},
-		]);
-		
-		// Set dummy staff data
-		setRecentStaff([
-			{
-				id: '1',
-				name: 'Dr. Sarah Johnson',
-				role: 'doctor',
-				specialty: 'General Medicine',
-				shiftStart: '09:00',
-				shiftEnd: '17:00',
-				patientsServed: 45,
-				location: 'Clinic A',
-				contactNumber: '+91-9876543210',
-				email: 'sarah.johnson@jsf.org',
-				isActive: true,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			},
-			{
-				id: '2',
-				name: 'Nurse Priya Sharma',
-				role: 'nurse',
-				specialty: 'Emergency Care',
-				shiftStart: '08:00',
-				shiftEnd: '16:00',
-				patientsServed: 38,
-				location: 'Clinic B',
-				contactNumber: '+91-9876543211',
-				email: 'priya.sharma@jsf.org',
-				isActive: true,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			},
-		]);
-		
-		setLoading(false);
+		const fetchDashboardData = async () => {
+			setLoading(true);
+			try {
+				if (!firestore) {
+					setLoading(false);
+					return;
+				}
+				// Fetch inventory
+				const inventorySnap = await getDocs(collection(firestore, 'inventory'));
+				const inventoryList = inventorySnap.docs.map(doc => {
+					const data = doc.data();
+					return {
+						id: doc.id,
+						name: data.name || '',
+						quantity: data.quantity || 0,
+						cost: data.cost || 0,
+						location: data.location || '',
+						expiryWeeks: data.expiryWeeks || 0,
+						donor: data.donor || '',
+						purpose: data.purpose || '',
+						category: data.category || 'medicine',
+						minStockLevel: data.minStockLevel || 0,
+						unit: data.unit || '',
+						createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+						updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
+						createdBy: data.createdBy || '',
+					};
+				});
+				// Fetch staff
+				const staffSnap = await getDocs(collection(firestore, 'staff'));
+				const staffList = staffSnap.docs.map(doc => {
+					const data = doc.data();
+					return {
+						id: doc.id,
+						name: data.name || '',
+						role: data.role || 'volunteer',
+						'Speciality': data['Speciality'] || '',
+						shiftStart: data.shiftStart || '',
+						shiftEnd: data.shiftEnd || '',
+						'Entry Time': data['Entry Time'] || '',
+						'Exit Time': data['Exit Time'] || '',
+						'Number Of Patients': data['Number Of Patients'] || 0,
+						'Physician Contact Number': data['Physician Contact Number'] || '',
+						'S.No': data['S.No'] || 0,
+						patientsServed: data.patientsServed || 0,
+						location: data.location || '',
+						contactNumber: data.contactNumber || '',
+						email: data.email || '',
+						isActive: typeof data.isActive === 'boolean' ? data.isActive : true,
+						createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+						updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
+					};
+				});
+				// Calculate stats
+				const lowStockItems = inventoryList.filter(item => item.quantity <= item.minStockLevel).length;
+				const expiringItems = inventoryList.filter(item => item.expiryWeeks <= 4).length;
+				const totalValue = inventoryList.reduce((sum, item) => sum + (item.quantity * item.cost), 0);
+				setStats({
+					totalInventory: inventoryList.length,
+					totalStaff: staffList.length,
+					lowStockItems,
+					expiringItems,
+					totalValue,
+				});
+				// Recent inventory and staff (last 5)
+				setRecentInventory(
+					inventoryList
+						.sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0))
+						.slice(0, 5)
+				);
+				setRecentStaff(
+					staffList
+						.sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0))
+						.slice(0, 5)
+				);
+			} catch (err) {
+				console.error('Error fetching dashboard data:', err);
+			} finally {
+				setLoading(false);
+			}
+		};
+		fetchDashboardData();
 	}, []);
 
 	const getStatusColor = (item: InventoryItem) => {
-		if (isExpired(item.expiryDate)) return 'text-red-600';
-		if (isExpiringSoon(item.expiryDate, 30)) return 'text-yellow-600';
+		if (item.expiryWeeks === 0) return 'text-red-600';
+		if (item.expiryWeeks <= 4) return 'text-yellow-600';
 		return 'text-green-600';
 	};
 
 	const getStatusText = (item: InventoryItem) => {
-		if (isExpired(item.expiryDate)) return 'Expired';
-		if (isExpiringSoon(item.expiryDate, 30)) return 'Expiring Soon';
+		if (item.expiryWeeks === 0) return 'Expired';
+		if (item.expiryWeeks <= 4) return 'Expiring Soon';
 		return 'Good';
 	};
 
@@ -254,9 +261,11 @@ const DashboardPage = () => {
 									))}
 								</div>
 								<div className="mt-4">
-									<Button variant="outline" className="w-full">
-										View All Inventory
-									</Button>
+									<Link href="/inventory" passHref legacyBehavior>
+										<Button variant="outline" className="w-full">
+											View All Inventory
+										</Button>
+									</Link>
 								</div>
 							</CardContent>
 						</Card>
@@ -285,16 +294,18 @@ const DashboardPage = () => {
 												</div>
 											</div>
 											<div className="text-right">
-												<p className="text-sm font-medium">{member.patientsServed}</p>
-												<p className="text-xs text-gray-500">Patients served</p>
+												<p className="text-sm font-medium">{member['Number Of Patients']}</p>
+												<p className="text-xs text-gray-500">Number Of Patients</p>
 											</div>
 										</div>
 									))}
 								</div>
 								<div className="mt-4">
-									<Button variant="outline" className="w-full">
-										View All Staff
-									</Button>
+									<Link href="/staff" passHref legacyBehavior>
+										<Button variant="outline" className="w-full">
+											View All Staff
+										</Button>
+									</Link>
 								</div>
 							</CardContent>
 						</Card>

@@ -1,67 +1,47 @@
-import { InventoryItem } from '@/types';
+import { firestore } from '@/lib/firebase';
+import { deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-
-// Mock data for demo
-const mockInventory: InventoryItem[] = [
-	{
-		id: '1',
-		name: 'Paracetamol 500mg',
-		quantity: 50,
-		cost: 2.5,
-		location: 'Medical Store A',
-		expiryDate: new Date('2024-12-31'),
-		purpose: 'Pain relief',
-		category: 'medicine',
-		minStockLevel: 20,
-		unit: 'tablets',
-		createdAt: new Date(),
-		updatedAt: new Date(),
-		createdBy: 'admin',
-	},
-	{
-		id: '2',
-		name: 'Surgical Masks',
-		quantity: 200,
-		cost: 1.0,
-		location: 'Medical Store B',
-		expiryDate: new Date('2025-06-30'),
-		purpose: 'Protection',
-		category: 'supplies',
-		minStockLevel: 100,
-		unit: 'pieces',
-		createdAt: new Date(),
-		updatedAt: new Date(),
-		createdBy: 'admin',
-	},
-];
 
 // GET /api/inventory/[id]
 export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const { id } = await params;
-
-		if (!id) {
+		if (!id)
 			return NextResponse.json(
 				{ success: false, error: 'Item ID is required' },
 				{ status: 400 }
 			);
-		}
-
-		const item = mockInventory.find((item) => item.id === id);
-
-		if (!item) {
+		const docRef = doc(firestore, 'inventory', id);
+		const docSnap = await getDoc(docRef);
+		if (!docSnap.exists())
 			return NextResponse.json(
 				{ success: false, error: 'Item not found' },
 				{ status: 404 }
 			);
-		}
-
+		const data = docSnap.data() as any;
 		return NextResponse.json({
 			success: true,
-			data: item,
+			data: {
+				id: docSnap.id,
+				...data,
+				expiryDate: data.expiryDate?.toDate
+					? data.expiryDate.toDate()
+					: data.expiryDate,
+				createdAt: data.createdAt?.toDate
+					? data.createdAt.toDate()
+					: data.createdAt,
+				updatedAt: data.updatedAt?.toDate
+					? data.updatedAt.toDate()
+					: data.updatedAt,
+			},
 		});
 	} catch (error) {
 		console.error('Error fetching inventory item:', error);
@@ -77,33 +57,21 @@ export async function PUT(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const { id } = await params;
 		const body = await request.json();
-
-		if (!id) {
+		if (!id)
 			return NextResponse.json(
 				{ success: false, error: 'Item ID is required' },
 				{ status: 400 }
 			);
-		}
-
-		const itemIndex = mockInventory.findIndex((item) => item.id === id);
-
-		if (itemIndex === -1) {
-			return NextResponse.json(
-				{ success: false, error: 'Item not found' },
-				{ status: 404 }
-			);
-		}
-
-		// Update the item
-		mockInventory[itemIndex] = {
-			...mockInventory[itemIndex],
-			...body,
-			updatedAt: new Date(),
-		};
-
+		const docRef = doc(firestore, 'inventory', id);
+		await updateDoc(docRef, { ...body, updatedAt: new Date() });
 		return NextResponse.json({
 			success: true,
 			message: 'Item updated successfully',
@@ -122,28 +90,20 @@ export async function DELETE(
 	request: NextRequest,
 	{ params }: { params: Promise<{ id: string }> }
 ) {
+	if (!firestore)
+		return NextResponse.json(
+			{ success: false, error: 'Firestore not initialized' },
+			{ status: 500 }
+		);
 	try {
 		const { id } = await params;
-
-		if (!id) {
+		if (!id)
 			return NextResponse.json(
 				{ success: false, error: 'Item ID is required' },
 				{ status: 400 }
 			);
-		}
-
-		const itemIndex = mockInventory.findIndex((item) => item.id === id);
-
-		if (itemIndex === -1) {
-			return NextResponse.json(
-				{ success: false, error: 'Item not found' },
-				{ status: 404 }
-			);
-		}
-
-		// Remove the item
-		mockInventory.splice(itemIndex, 1);
-
+		const docRef = doc(firestore, 'inventory', id);
+		await deleteDoc(docRef);
 		return NextResponse.json({
 			success: true,
 			message: 'Item deleted successfully',
