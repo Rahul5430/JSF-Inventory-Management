@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types';
-import { Eye, EyeOff, Lock, Mail, Shield, User } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -93,7 +93,6 @@ const RegisterPage = () => {
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   placeholder="Enter your full name"
-                  icon={<User className="h-5 w-5 text-gray-400" />}
                 />
               </div>
             </div>
@@ -112,7 +111,6 @@ const RegisterPage = () => {
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="Enter your email"
-                  icon={<Mail className="h-5 w-5 text-gray-400" />}
                 />
               </div>
             </div>
@@ -128,12 +126,12 @@ const RegisterPage = () => {
                   name="role"
                   value={formData.role}
                   onChange={(e) => handleInputChange('role', e.target.value as UserRole)}
-                  icon={<Shield className="h-5 w-5 text-gray-400" />}
-                >
-                  <option value="volunteer">Volunteer</option>
-                  <option value="coordinator">Coordinator</option>
-                  <option value="admin">Admin</option>
-                </Select>
+                  options={[
+                    { value: 'volunteer', label: 'Volunteer' },
+                    { value: 'coordinator', label: 'Coordinator' },
+                    { value: 'admin', label: 'Admin' },
+                  ]}
+                />
               </div>
             </div>
 
@@ -151,17 +149,14 @@ const RegisterPage = () => {
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   placeholder="Enter your password"
-                  icon={<Lock className="h-5 w-5 text-gray-400" />}
-                  endIcon={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
-                  }
                 />
+                <button
+                  type="button"
+                  className="absolute right-3 top-2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 
@@ -179,17 +174,14 @@ const RegisterPage = () => {
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                   placeholder="Confirm your password"
-                  icon={<Lock className="h-5 w-5 text-gray-400" />}
-                  endIcon={
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
-                  }
                 />
+                <button
+                  type="button"
+                  className="absolute right-3 top-2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
           </div>

@@ -1,16 +1,54 @@
-import { firestore } from '@/lib/firebase';
 import { InventoryItem } from '@/types';
-import {
-	addDoc,
-	collection,
-	getDocs,
-	orderBy,
-	query,
-	serverTimestamp,
-	startAfter,
-	where,
-} from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
+
+// Mock data for demo
+const mockInventory: InventoryItem[] = [
+	{
+		id: '1',
+		name: 'Paracetamol 500mg',
+		quantity: 50,
+		cost: 2.5,
+		location: 'Medical Store A',
+		expiryDate: new Date('2024-12-31'),
+		purpose: 'Pain relief',
+		category: 'medicine',
+		minStockLevel: 20,
+		unit: 'tablets',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		createdBy: 'admin',
+	},
+	{
+		id: '2',
+		name: 'Surgical Masks',
+		quantity: 200,
+		cost: 1.0,
+		location: 'Medical Store B',
+		expiryDate: new Date('2025-06-30'),
+		purpose: 'Protection',
+		category: 'supplies',
+		minStockLevel: 100,
+		unit: 'pieces',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		createdBy: 'admin',
+	},
+	{
+		id: '3',
+		name: 'Blood Pressure Monitor',
+		quantity: 5,
+		cost: 1500.0,
+		location: 'Equipment Room',
+		expiryDate: new Date('2026-12-31'),
+		purpose: 'Patient monitoring',
+		category: 'equipment',
+		minStockLevel: 2,
+		unit: 'units',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		createdBy: 'admin',
+	},
+];
 
 // GET /api/inventory
 export async function GET(request: NextRequest) {
@@ -24,74 +62,56 @@ export async function GET(request: NextRequest) {
 		const sortBy = searchParams.get('sortBy') ?? 'createdAt';
 		const sortOrder = searchParams.get('sortOrder') ?? 'desc';
 
-		const inventoryRef = collection(firestore, 'inventory');
-		let q = query(inventoryRef);
+		let filteredData = [...mockInventory];
 
 		// Apply filters
 		if (search) {
-			q = query(
-				q,
-				where('name', '>=', search),
-				where('name', '<=', search + '\uf8ff')
+			filteredData = filteredData.filter((item) =>
+				item.name.toLowerCase().includes(search.toLowerCase())
 			);
 		}
 		if (category) {
-			q = query(q, where('category', '==', category));
+			filteredData = filteredData.filter(
+				(item) => item.category === category
+			);
 		}
 		if (location) {
-			q = query(q, where('location', '==', location));
+			filteredData = filteredData.filter((item) =>
+				item.location.toLowerCase().includes(location.toLowerCase())
+			);
 		}
 
 		// Apply sorting
-		q = query(q, orderBy(sortBy, sortOrder as 'asc' | 'desc'));
+		filteredData.sort((a, b) => {
+			const aValue = a[sortBy as keyof InventoryItem] ?? '';
+			const bValue = b[sortBy as keyof InventoryItem] ?? '';
 
-		// Apply pagination
-		const offset = (page - 1) * limit;
-		if (offset > 0) {
-			// For pagination, we need to get the last document from previous page
-			const prevQuery = query(q, limit(offset));
-			const prevDocs = await getDocs(prevQuery);
-			const lastDoc = prevDocs.docs[prevDocs.docs.length - 1];
-			if (lastDoc) {
-				q = query(q, startAfter(lastDoc), limit(limit));
+			if (sortOrder === 'asc') {
+				return aValue > bValue ? 1 : -1;
+			} else {
+				return aValue < bValue ? 1 : -1;
 			}
-		} else {
-			q = query(q, limit(limit));
-		}
-
-		const snapshot = await getDocs(q);
-		const inventory: InventoryItem[] = [];
-
-		snapshot.forEach((doc) => {
-			const data = doc.data();
-			inventory.push({
-				id: doc.id,
-				...data,
-				createdAt: data.createdAt?.toDate(),
-				updatedAt: data.updatedAt?.toDate(),
-				expiryDate: data.expiryDate?.toDate(),
-			} as InventoryItem);
 		});
 
-		// Get total count for pagination
-		const totalQuery = query(inventoryRef);
-		const totalSnapshot = await getDocs(totalQuery);
-		const total = totalSnapshot.size;
+		// Apply pagination
+		const startIndex = (page - 1) * limit;
+		const endIndex = startIndex + limit;
+		const paginatedData = filteredData.slice(startIndex, endIndex);
 
 		return NextResponse.json({
 			success: true,
-			data: inventory,
+			data: paginatedData,
 			pagination: {
 				page,
 				limit,
-				total,
-				totalPages: Math.ceil(total / limit),
+				total: filteredData.length,
+				totalPages: Math.ceil(filteredData.length / limit),
 			},
 		});
 	} catch (error) {
 		console.error('Error fetching inventory:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to fetch inventory' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}
@@ -112,7 +132,6 @@ export async function POST(request: NextRequest) {
 			category,
 			minStockLevel,
 			unit,
-			createdBy,
 		} = body;
 
 		// Validate required fields
@@ -131,36 +150,34 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const inventoryData = {
+		const newItem: InventoryItem = {
+			id: (mockInventory.length + 1).toString(),
 			name,
-			quantity: Number(quantity),
-			cost: Number(cost) || 0,
+			quantity: parseInt(quantity),
+			cost: parseFloat(cost) || 0,
 			location,
 			expiryDate: new Date(expiryDate),
 			donor: donor || '',
 			purpose,
 			category,
-			minStockLevel: Number(minStockLevel) || 0,
+			minStockLevel: parseInt(minStockLevel) || 0,
 			unit,
-			createdBy,
-			createdAt: serverTimestamp(),
-			updatedAt: serverTimestamp(),
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			createdBy: 'admin',
 		};
 
-		const docRef = await addDoc(
-			collection(firestore, 'inventory'),
-			inventoryData
-		);
+		mockInventory.push(newItem);
 
 		return NextResponse.json({
 			success: true,
-			data: { id: docRef.id, ...inventoryData },
-			message: 'Inventory item added successfully',
+			data: newItem,
+			message: 'Item added successfully',
 		});
 	} catch (error) {
 		console.error('Error adding inventory item:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to add inventory item' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}

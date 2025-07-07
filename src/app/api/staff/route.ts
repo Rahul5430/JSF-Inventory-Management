@@ -1,16 +1,54 @@
-import { firestore } from '@/lib/firebase';
 import { StaffMember } from '@/types';
-import {
-	addDoc,
-	collection,
-	getDocs,
-	orderBy,
-	query,
-	serverTimestamp,
-	startAfter,
-	where,
-} from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
+
+// Mock data for demo
+const mockStaff: StaffMember[] = [
+	{
+		id: '1',
+		name: 'Dr. Sarah Johnson',
+		role: 'doctor',
+		specialty: 'General Medicine',
+		shiftStart: '09:00',
+		shiftEnd: '17:00',
+		patientsServed: 45,
+		location: 'Clinic A',
+		contactNumber: '+91-9876543210',
+		email: 'sarah.johnson@jsf.org',
+		isActive: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	},
+	{
+		id: '2',
+		name: 'Nurse Priya Sharma',
+		role: 'nurse',
+		specialty: 'Emergency Care',
+		shiftStart: '08:00',
+		shiftEnd: '16:00',
+		patientsServed: 38,
+		location: 'Clinic B',
+		contactNumber: '+91-9876543211',
+		email: 'priya.sharma@jsf.org',
+		isActive: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	},
+	{
+		id: '3',
+		name: 'Dr. Rajesh Kumar',
+		role: 'doctor',
+		specialty: 'Cardiology',
+		shiftStart: '10:00',
+		shiftEnd: '18:00',
+		patientsServed: 52,
+		location: 'Clinic C',
+		contactNumber: '+91-9876543212',
+		email: 'rajesh.kumar@jsf.org',
+		isActive: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	},
+];
 
 // GET /api/staff
 export async function GET(request: NextRequest) {
@@ -25,76 +63,62 @@ export async function GET(request: NextRequest) {
 		const sortBy = searchParams.get('sortBy') ?? 'createdAt';
 		const sortOrder = searchParams.get('sortOrder') ?? 'desc';
 
-		const staffRef = collection(firestore, 'staff');
-		let q = query(staffRef);
+		let filteredData = [...mockStaff];
 
 		// Apply filters
 		if (search) {
-			q = query(
-				q,
-				where('name', '>=', search),
-				where('name', '<=', search + '\uf8ff')
+			filteredData = filteredData.filter((member) =>
+				member.name.toLowerCase().includes(search.toLowerCase())
 			);
 		}
 		if (role) {
-			q = query(q, where('role', '==', role));
+			filteredData = filteredData.filter(
+				(member) => member.role === role
+			);
 		}
 		if (location) {
-			q = query(q, where('location', '==', location));
+			filteredData = filteredData.filter((member) =>
+				member.location.toLowerCase().includes(location.toLowerCase())
+			);
 		}
-		if (isActive !== null && isActive !== undefined) {
-			q = query(q, where('isActive', '==', isActive === 'true'));
+		if (isActive !== null) {
+			const activeFilter = isActive === 'true';
+			filteredData = filteredData.filter(
+				(member) => member.isActive === activeFilter
+			);
 		}
 
 		// Apply sorting
-		q = query(q, orderBy(sortBy, sortOrder as 'asc' | 'desc'));
+		filteredData.sort((a, b) => {
+			const aValue = a[sortBy as keyof StaffMember] ?? '';
+			const bValue = b[sortBy as keyof StaffMember] ?? '';
 
-		// Apply pagination
-		const offset = (page - 1) * limit;
-		if (offset > 0) {
-			// For pagination, we need to get the last document from previous page
-			const prevQuery = query(q, limit(offset));
-			const prevDocs = await getDocs(prevQuery);
-			const lastDoc = prevDocs.docs[prevDocs.docs.length - 1];
-			if (lastDoc) {
-				q = query(q, startAfter(lastDoc), limit(limit));
+			if (sortOrder === 'asc') {
+				return aValue > bValue ? 1 : -1;
+			} else {
+				return aValue < bValue ? 1 : -1;
 			}
-		} else {
-			q = query(q, limit(limit));
-		}
-
-		const snapshot = await getDocs(q);
-		const staff: StaffMember[] = [];
-
-		snapshot.forEach((doc) => {
-			const data = doc.data();
-			staff.push({
-				id: doc.id,
-				...data,
-				createdAt: data.createdAt?.toDate(),
-				updatedAt: data.updatedAt?.toDate(),
-			} as StaffMember);
 		});
 
-		// Get total count for pagination
-		const totalQuery = query(staffRef);
-		const totalSnapshot = await getDocs(totalQuery);
-		const total = totalSnapshot.size;
+		// Apply pagination
+		const startIndex = (page - 1) * limit;
+		const endIndex = startIndex + limit;
+		const paginatedData = filteredData.slice(startIndex, endIndex);
 
 		return NextResponse.json({
 			success: true,
-			data: staff,
+			data: paginatedData,
 			pagination: {
 				page,
 				limit,
-				total,
-				totalPages: Math.ceil(total / limit),
+				total: filteredData.length,
+				totalPages: Math.ceil(filteredData.length / limit),
 			},
 		});
 	} catch (error) {
 		console.error('Error fetching staff:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to fetch staff' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}
@@ -133,32 +157,33 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const staffData = {
+		const newStaff: StaffMember = {
+			id: (mockStaff.length + 1).toString(),
 			name,
 			role,
 			specialty: specialty || '',
 			shiftStart,
 			shiftEnd,
-			patientsServed: Number(patientsServed) || 0,
+			patientsServed: parseInt(patientsServed) || 0,
 			location,
 			contactNumber,
 			email,
-			isActive: isActive !== undefined ? Boolean(isActive) : true,
-			createdAt: serverTimestamp(),
-			updatedAt: serverTimestamp(),
+			isActive: Boolean(isActive),
+			createdAt: new Date(),
+			updatedAt: new Date(),
 		};
 
-		const docRef = await addDoc(collection(firestore, 'staff'), staffData);
+		mockStaff.push(newStaff);
 
 		return NextResponse.json({
 			success: true,
-			data: { id: docRef.id, ...staffData },
+			data: newStaff,
 			message: 'Staff member added successfully',
 		});
 	} catch (error) {
 		console.error('Error adding staff member:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to add staff member' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}

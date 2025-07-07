@@ -1,48 +1,72 @@
-import { firestore } from '@/lib/firebase';
 import { InventoryItem } from '@/types';
-import {
-	deleteDoc,
-	doc,
-	getDoc,
-	serverTimestamp,
-	updateDoc,
-} from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
+
+// Mock data for demo
+const mockInventory: InventoryItem[] = [
+	{
+		id: '1',
+		name: 'Paracetamol 500mg',
+		quantity: 50,
+		cost: 2.5,
+		location: 'Medical Store A',
+		expiryDate: new Date('2024-12-31'),
+		purpose: 'Pain relief',
+		category: 'medicine',
+		minStockLevel: 20,
+		unit: 'tablets',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		createdBy: 'admin',
+	},
+	{
+		id: '2',
+		name: 'Surgical Masks',
+		quantity: 200,
+		cost: 1.0,
+		location: 'Medical Store B',
+		expiryDate: new Date('2025-06-30'),
+		purpose: 'Protection',
+		category: 'supplies',
+		minStockLevel: 100,
+		unit: 'pieces',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		createdBy: 'admin',
+	},
+];
 
 // GET /api/inventory/[id]
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const { id } = params;
-		const docRef = doc(firestore, 'inventory', id);
-		const docSnap = await getDoc(docRef);
+		const { id } = await params;
 
-		if (!docSnap.exists()) {
+		if (!id) {
 			return NextResponse.json(
-				{ success: false, error: 'Inventory item not found' },
+				{ success: false, error: 'Item ID is required' },
+				{ status: 400 }
+			);
+		}
+
+		const item = mockInventory.find((item) => item.id === id);
+
+		if (!item) {
+			return NextResponse.json(
+				{ success: false, error: 'Item not found' },
 				{ status: 404 }
 			);
 		}
 
-		const data = docSnap.data();
-		const inventoryItem: InventoryItem = {
-			id: docSnap.id,
-			...data,
-			createdAt: data.createdAt?.toDate(),
-			updatedAt: data.updatedAt?.toDate(),
-			expiryDate: data.expiryDate?.toDate(),
-		} as InventoryItem;
-
 		return NextResponse.json({
 			success: true,
-			data: inventoryItem,
+			data: item,
 		});
 	} catch (error) {
 		console.error('Error fetching inventory item:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to fetch inventory item' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}
@@ -51,75 +75,43 @@ export async function GET(
 // PUT /api/inventory/[id]
 export async function PUT(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const { id } = params;
+		const { id } = await params;
 		const body = await request.json();
-		const {
-			name,
-			quantity,
-			cost,
-			location,
-			expiryDate,
-			donor,
-			purpose,
-			category,
-			minStockLevel,
-			unit,
-		} = body;
 
-		// Validate required fields
-		if (
-			!name ||
-			!quantity ||
-			!location ||
-			!expiryDate ||
-			!purpose ||
-			!category ||
-			!unit
-		) {
+		if (!id) {
 			return NextResponse.json(
-				{ success: false, error: 'Missing required fields' },
+				{ success: false, error: 'Item ID is required' },
 				{ status: 400 }
 			);
 		}
 
-		const docRef = doc(firestore, 'inventory', id);
-		const docSnap = await getDoc(docRef);
+		const itemIndex = mockInventory.findIndex((item) => item.id === id);
 
-		if (!docSnap.exists()) {
+		if (itemIndex === -1) {
 			return NextResponse.json(
-				{ success: false, error: 'Inventory item not found' },
+				{ success: false, error: 'Item not found' },
 				{ status: 404 }
 			);
 		}
 
-		const updateData = {
-			name,
-			quantity: Number(quantity),
-			cost: Number(cost) || 0,
-			location,
-			expiryDate: new Date(expiryDate),
-			donor: donor || '',
-			purpose,
-			category,
-			minStockLevel: Number(minStockLevel) || 0,
-			unit,
-			updatedAt: serverTimestamp(),
+		// Update the item
+		mockInventory[itemIndex] = {
+			...mockInventory[itemIndex],
+			...body,
+			updatedAt: new Date(),
 		};
-
-		await updateDoc(docRef, updateData);
 
 		return NextResponse.json({
 			success: true,
-			data: { id, ...updateData },
-			message: 'Inventory item updated successfully',
+			message: 'Item updated successfully',
 		});
 	} catch (error) {
 		console.error('Error updating inventory item:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to update inventory item' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}
@@ -128,30 +120,38 @@ export async function PUT(
 // DELETE /api/inventory/[id]
 export async function DELETE(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const { id } = params;
-		const docRef = doc(firestore, 'inventory', id);
-		const docSnap = await getDoc(docRef);
+		const { id } = await params;
 
-		if (!docSnap.exists()) {
+		if (!id) {
 			return NextResponse.json(
-				{ success: false, error: 'Inventory item not found' },
+				{ success: false, error: 'Item ID is required' },
+				{ status: 400 }
+			);
+		}
+
+		const itemIndex = mockInventory.findIndex((item) => item.id === id);
+
+		if (itemIndex === -1) {
+			return NextResponse.json(
+				{ success: false, error: 'Item not found' },
 				{ status: 404 }
 			);
 		}
 
-		await deleteDoc(docRef);
+		// Remove the item
+		mockInventory.splice(itemIndex, 1);
 
 		return NextResponse.json({
 			success: true,
-			message: 'Inventory item deleted successfully',
+			message: 'Item deleted successfully',
 		});
 	} catch (error) {
 		console.error('Error deleting inventory item:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to delete inventory item' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}

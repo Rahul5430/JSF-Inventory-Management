@@ -1,47 +1,72 @@
-import { firestore } from '@/lib/firebase';
 import { StaffMember } from '@/types';
-import {
-	deleteDoc,
-	doc,
-	getDoc,
-	serverTimestamp,
-	updateDoc,
-} from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
+
+// Mock data for demo
+const mockStaff: StaffMember[] = [
+	{
+		id: '1',
+		name: 'Dr. Sarah Johnson',
+		role: 'doctor',
+		specialty: 'General Medicine',
+		shiftStart: '09:00',
+		shiftEnd: '17:00',
+		patientsServed: 45,
+		location: 'Clinic A',
+		contactNumber: '+91-9876543210',
+		email: 'sarah.johnson@jsf.org',
+		isActive: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	},
+	{
+		id: '2',
+		name: 'Nurse Priya Sharma',
+		role: 'nurse',
+		specialty: 'Emergency Care',
+		shiftStart: '08:00',
+		shiftEnd: '16:00',
+		patientsServed: 38,
+		location: 'Clinic B',
+		contactNumber: '+91-9876543211',
+		email: 'priya.sharma@jsf.org',
+		isActive: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	},
+];
 
 // GET /api/staff/[id]
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const { id } = params;
-		const docRef = doc(firestore, 'staff', id);
-		const docSnap = await getDoc(docRef);
+		const { id } = await params;
 
-		if (!docSnap.exists()) {
+		if (!id) {
+			return NextResponse.json(
+				{ success: false, error: 'Staff ID is required' },
+				{ status: 400 }
+			);
+		}
+
+		const staff = mockStaff.find((member) => member.id === id);
+
+		if (!staff) {
 			return NextResponse.json(
 				{ success: false, error: 'Staff member not found' },
 				{ status: 404 }
 			);
 		}
 
-		const data = docSnap.data();
-		const staffMember: StaffMember = {
-			id: docSnap.id,
-			...data,
-			createdAt: data.createdAt?.toDate(),
-			updatedAt: data.updatedAt?.toDate(),
-		} as StaffMember;
-
 		return NextResponse.json({
 			success: true,
-			data: staffMember,
+			data: staff,
 		});
 	} catch (error) {
 		console.error('Error fetching staff member:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to fetch staff member' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}
@@ -50,75 +75,43 @@ export async function GET(
 // PUT /api/staff/[id]
 export async function PUT(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const { id } = params;
+		const { id } = await params;
 		const body = await request.json();
-		const {
-			name,
-			role,
-			specialty,
-			shiftStart,
-			shiftEnd,
-			patientsServed,
-			location,
-			contactNumber,
-			email,
-			isActive,
-		} = body;
 
-		// Validate required fields
-		if (
-			!name ||
-			!role ||
-			!shiftStart ||
-			!shiftEnd ||
-			!location ||
-			!contactNumber ||
-			!email
-		) {
+		if (!id) {
 			return NextResponse.json(
-				{ success: false, error: 'Missing required fields' },
+				{ success: false, error: 'Staff ID is required' },
 				{ status: 400 }
 			);
 		}
 
-		const docRef = doc(firestore, 'staff', id);
-		const docSnap = await getDoc(docRef);
+		const memberIndex = mockStaff.findIndex((member) => member.id === id);
 
-		if (!docSnap.exists()) {
+		if (memberIndex === -1) {
 			return NextResponse.json(
 				{ success: false, error: 'Staff member not found' },
 				{ status: 404 }
 			);
 		}
 
-		const updateData = {
-			name,
-			role,
-			specialty: specialty || '',
-			shiftStart,
-			shiftEnd,
-			patientsServed: Number(patientsServed) || 0,
-			location,
-			contactNumber,
-			email,
-			isActive: isActive !== undefined ? Boolean(isActive) : true,
-			updatedAt: serverTimestamp(),
+		// Update the staff member
+		mockStaff[memberIndex] = {
+			...mockStaff[memberIndex],
+			...body,
+			updatedAt: new Date(),
 		};
-
-		await updateDoc(docRef, updateData);
 
 		return NextResponse.json({
 			success: true,
-			data: { id, ...updateData },
 			message: 'Staff member updated successfully',
 		});
 	} catch (error) {
 		console.error('Error updating staff member:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to update staff member' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}
@@ -127,21 +120,29 @@ export async function PUT(
 // DELETE /api/staff/[id]
 export async function DELETE(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
 	try {
-		const { id } = params;
-		const docRef = doc(firestore, 'staff', id);
-		const docSnap = await getDoc(docRef);
+		const { id } = await params;
 
-		if (!docSnap.exists()) {
+		if (!id) {
+			return NextResponse.json(
+				{ success: false, error: 'Staff ID is required' },
+				{ status: 400 }
+			);
+		}
+
+		const memberIndex = mockStaff.findIndex((member) => member.id === id);
+
+		if (memberIndex === -1) {
 			return NextResponse.json(
 				{ success: false, error: 'Staff member not found' },
 				{ status: 404 }
 			);
 		}
 
-		await deleteDoc(docRef);
+		// Remove the staff member
+		mockStaff.splice(memberIndex, 1);
 
 		return NextResponse.json({
 			success: true,
@@ -150,7 +151,7 @@ export async function DELETE(
 	} catch (error) {
 		console.error('Error deleting staff member:', error);
 		return NextResponse.json(
-			{ success: false, error: 'Failed to delete staff member' },
+			{ success: false, error: 'Internal server error' },
 			{ status: 500 }
 		);
 	}
