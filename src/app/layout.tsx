@@ -17,18 +17,81 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "JSF Inventory Management",
-  description: "Inventory and HR management system for Jeevan Stambh Foundation",
-  manifest: "/manifest.json",
-};
-
 export const viewport: Viewport = {
   themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
 };
+
+export const metadata: Metadata = {
+	title: 'JSF Inventory Management | Jeevan Stambh Foundation',
+	description:
+	  'Streamline inventory and HR operations with JSF Inventory Management. Built with Next.js, Tailwind CSS, and Firebase for fast, responsive, and real-time tracking of medicines, equipment, and staff.',
+	applicationName: 'JSF Inventory Management',
+	authors: [{ name: 'Rahul Sharma' }],
+	creator: 'Rahul Sharma',
+	publisher: 'Jeevan Stambh Foundation',
+	formatDetection: {
+	  email: false,
+	  address: false,
+	  telephone: false,
+	},
+	icons: {
+	  icon: [
+		{ url: '/favicon.ico' },
+		{ url: '/favicon-32x32.png', sizes: '32x32' },
+		{ url: '/favicon-16x16.png', sizes: '16x16' },
+	  ],
+	  shortcut: '/favicon.ico',
+	  apple: '/apple-touch-icon.png',
+	},
+	appleWebApp: {
+	  title: 'JSF Inventory Management',
+	  statusBarStyle: 'black-translucent',
+	  startupImage: [],
+	},
+	openGraph: {
+	  title: 'JSF Inventory Management | Jeevan Stambh Foundation',
+	  description:
+		'Manage inventory and staff effortlessly using JSF Inventory Management, optimized for NGOs and healthcare foundations.',
+	  url: 'https://jsf-inventory-management.vercel.app/',
+	  siteName: 'JSF Inventory Management',
+	  type: 'website',
+	  images: [
+		{
+		  url: 'https://jsf-inventory-management.vercel.app/og-image.png', // Replace with your actual OG image URL
+		  width: 1200,
+		  height: 630,
+		},
+	  ],
+	},
+	twitter: {
+	  card: 'summary_large_image',
+	  title: 'JSF Inventory Management | Jeevan Stambh Foundation',
+	  description:
+		'Built for Jeevan Stambh Foundation to manage inventory and staff efficiently.',
+	  creator: '@RahulSharma5430',
+	  images: 'https://jsf-inventory-management.vercel.app/og-image.png', // Replace with your actual OG image
+	},
+	robots: {
+	  index: true,
+	  follow: true,
+	  nocache: false,
+	  googleBot: {
+		index: true,
+		follow: true,
+		noimageindex: false,
+		'max-video-preview': -1,
+		'max-image-preview': 'large',
+		'max-snippet': -1,
+	  },
+	},
+	manifest: '/manifest.json',
+	keywords:
+	  'JSF, Inventory Management, NGO Tools, Healthcare Inventory, Firebase, Next.js, Jeevan Stambh Foundation, Staff Management',
+  };
+  
 
 export default function RootLayout({
   children,
