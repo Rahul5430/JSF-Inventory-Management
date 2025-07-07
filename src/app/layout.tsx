@@ -1,7 +1,9 @@
+import AppShell from '@/components/layout/AppShell';
 import I18nProvider from "@/components/providers/I18nProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import React from "react";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
@@ -47,7 +49,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <I18nProvider>
-            {children}
+            <AppShell>
+              {children}
+            </AppShell>
             <Toaster
               position="top-right"
               toastOptions={{
